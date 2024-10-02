@@ -5,6 +5,7 @@ from aiohttp import ClientSession
 import nest_asyncio
 import logging
 import time
+from prettytable import PrettyTable
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -105,6 +106,7 @@ async def control_n_devices_no_wait(session, scene_name, state, n):
     return success, execution_time
 
 async def main():
+    results = []  # 用于存储结果的列表
     async with ClientSession() as session:
         while True:
             print("\nPlease select an option:")
@@ -119,31 +121,37 @@ async def main():
             print("8. Turn First 15 Devices Off (No Wait)")
             print("9. Turn First 20 Devices On (No Wait)")
             print("10. Turn First 20 Devices Off (No Wait)")
-            print("11. Exit")
+            print("11. Exit and Show Results")
             
             choice = input("Enter your choice (0-11): ")
             
             if choice == '0':
                 devices = await get_all_devices(session)
                 print(f"Retrieved {len(devices)} devices")
-            elif choice == '1':
-                devices = await get_all_devices(session)
-                success, execution_time = await control_n_devices_no_wait(session, "Turn All On", True, len(devices))
-                print(f"Turn All On completed in {execution_time:.2f} seconds. All commands sent: {success}")
-            elif choice == '2':
-                devices = await get_all_devices(session)
-                success, execution_time = await control_n_devices_no_wait(session, "Turn All Off", False, len(devices))
-                print(f"Turn All Off completed in {execution_time:.2f} seconds. All commands sent: {success}")
-            elif choice in ['3', '4', '5', '6', '7', '8', '9', '10']:
-                n = [5, 5, 10, 10, 15, 15, 20, 20][int(choice) - 3]
-                state = int(choice) % 2 == 1
-                success, execution_time = await control_n_devices_no_wait(session, f"Turn First {n} {'On' if state else 'Off'}", state, n)
-                print(f"Turn First {n} {'On' if state else 'Off'} completed in {execution_time:.2f} seconds. All commands sent: {success}")
+            elif choice in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']:
+                if choice in ['1', '2']:
+                    devices = await get_all_devices(session)
+                    n = len(devices)
+                    scene_name = "Turn All On" if choice == '1' else "Turn All Off"
+                else:
+                    n = [5, 5, 10, 10, 15, 15, 20, 20][int(choice) - 3]
+                    scene_name = f"Turn First {n} {'On' if int(choice) % 2 == 1 else 'Off'}"
+                state = choice in ['1', '3', '5', '7', '9']
+                success, execution_time = await control_n_devices_no_wait(session, scene_name, state, n)
+                print(f"{scene_name} completed in {execution_time:.2f} seconds. All commands sent: {success}")
+                results.append((scene_name, execution_time, success))
             elif choice == '11':
-                print("Exiting program")
+                print("Exiting program and showing results")
                 break
             else:
                 print("Invalid option, please try again")
+
+    table = PrettyTable()
+    table.field_names = ["Operation", "Execution Time (s)", "Success"]
+    for result in results:
+        table.add_row([result[0], f"{result[1]:.2f}", result[2]])
+    print("\nResults:")
+    print(table)
 
 if __name__ == "__main__":
     asyncio.run(main())
